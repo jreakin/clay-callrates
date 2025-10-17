@@ -15,7 +15,6 @@ The reports we feed into this script leave a blank row on top and some extra dat
 We stop parsing when it hits a second blank cell, meaning we need to keep track of if we already skipped the first one.
 '''
 first_row_skipped = False 
-
 interval_dict: dict[str: dict[str : int]] = {} # Dictionary is structured like {1-1-1901 : {8:00:00 AM: 300, 9:00:00 AM : 500, ...}, 1-2-1901 : ...}
 input_rows: list[list[str] | tuple[str]] = [] # Rows to write to the temp file. csv returns lists, openpyxl returns tuples.
 input_spreadsheet: str = easygui.fileopenbox(msg = 'Select the input file (can be csv or xlsx). Only the first sheet of Excel files will be read. Output by default is "output.csv', 
@@ -29,8 +28,14 @@ if not input_spreadsheet:
 
 if input_spreadsheet[-3:] == 'csv':    
     with open(input_spreadsheet, 'r', encoding='utf-8-sig') as csvfile:
-        reader = csv.reader(csvfile)        
-        for row in reader:
+        reader = csv.reader(csvfile)                
+            
+if input_spreadsheet[-4:] == 'xlsx':
+    workbook = openpyxl.load_workbook(input_spreadsheet)
+    sheet = workbook.worksheets[0]
+    reader = sheet.iter_rows(values_only=True)
+
+for row in reader:
             if row[0] == None:
                 if not first_row_skipped:
                     first_row_skipped = True
@@ -39,19 +44,6 @@ if input_spreadsheet[-3:] == 'csv':
                 continue
             else:
                 input_rows.append(row)
-            
-if input_spreadsheet[-4:] == 'xlsx':
-    workbook = openpyxl.load_workbook(input_spreadsheet)
-    sheet = workbook.worksheets[0]
-    for row in sheet.iter_rows(values_only=True):
-        if row[0] == None:
-            if not first_row_skipped:
-                first_row_skipped = True
-                continue
-            else:
-                break            
-        else:
-            input_rows.append(row)
 
 with open('temp_file.csv', 'w', newline='') as temp:
     writer = csv.writer(temp)
