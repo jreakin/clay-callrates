@@ -1,113 +1,86 @@
 # Use this with the "TRENDING WITH VIEWS" report I made.
 # If you don't have access to that, any "Handled and Abandoned Trending" report with the  "Contact Service Queue Activity by Interval" view works as well.
 
-import csv
-import openpyxl
+import pandas as pd
 import easygui
-from typing import Generator
-import os # used to delete temp file
+import os
+from pathlib import Path
 
-start_times: list[str] = [] # A list of the actual start time intervals in each day. 8 am, 9 am, etc.
-end_times: list[str] = [] # Like above, but the end time. Each interval is one hour, ie 8 AM - 9 AM.
-
-'''
-The reports we feed into this script leave a blank row on top and some extra data on the bottom.
-We stop parsing when it hits a second blank cell, meaning we need to keep track of if we already skipped the first one.
-'''
-first_row_skipped = False 
-interval_dict: dict[str: dict[str : int]] = {} # Dictionary is structured like {1-1-1901 : {8:00:00 AM: 300, 9:00:00 AM : 500, ...}, 1-2-1901 : ...}
-input_rows: list[list[str] | tuple[str]] = [] # Rows to write to the temp file. csv returns lists, openpyxl returns tuples.
-input_spreadsheet: str = easygui.fileopenbox(msg = 'Select the input file (can be csv or xlsx). Only the first sheet of Excel files will be read. Output by default is "output.csv', 
-                                     default='*', 
-                                     multiple=False,
-                                     filetypes = ['*.csv', '*.xlsx'])
-
-if not input_spreadsheet:
-    print('No input file selected.')
-    exit()
-
-if input_spreadsheet[-3:] == 'csv':    
-    with open(input_spreadsheet, 'r', encoding='utf-8-sig') as csvfile:
-        reader = csv.reader(csvfile)                
-            
-if input_spreadsheet[-4:] == 'xlsx':
-    workbook = openpyxl.load_workbook(input_spreadsheet)
-    sheet = workbook.worksheets[0]
-    reader = sheet.iter_rows(values_only=True)
-
-for row in reader:
-            if row[0] == None:
-                if not first_row_skipped:
-                    first_row_skipped = True
-                else:
-                    break
-                continue
-            else:
-                input_rows.append(row)
-
-with open('temp_file.csv', 'w', newline='') as temp:
-    writer = csv.writer(temp)
-    for row in input_rows:
-        writer.writerow(row)
-input_file = 'temp_file.csv'
-
-def row_generator() -> Generator:     
-    with open(input_file, 'r', encoding='utf-8-sig') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            try:
-                yield row
-            except Exception as e:
-                print("Invalid row.\n", e)
-
-row_gen = row_generator()
-
-for row in row_gen:
-    split_interval_start = row['Interval Start Time'].split()
-    split_interval_end = row['Interval End Time'].split()
-    int_start_time = " ".join(split_interval_start[-2:])
-    int_end_time = " ".join(split_interval_end[-2:])
-    day = split_interval_start[0]
-    if int_start_time not in start_times:
-        start_times.append(int_start_time)
-    if int_end_time not in end_times:
-        end_times.append(int_end_time)
-    if day not in interval_dict.keys():
-        interval_dict[day] = {int_start_time : 0}
-    elif int_start_time not in interval_dict[day]:
-        interval_dict[day][int_start_time] = 0
+def process_call_rates():
+    """Process call rate data using pandas and proper datetime parsing."""
+    
+    # Get input file
+    input_spreadsheet = easygui.fileopenbox(
+        msg='Select the input file (can be csv or xlsx). Only the first sheet of Excel files will be read.',
+        default='*',
+        multiple=False,
+        filetypes=['*.csv', '*.xlsx']
+    )
+    
+    if not input_spreadsheet:
+        print('No input file selected.')
+        return
+    
+    # Read the data
     try:
-        interval_dict[day][int_start_time] += int(float(row['Calls Presented'])) # openpyxl treats cells a little different than the csv module, hence explicitly floating.
+        if input_spreadsheet.endswith('.csv'):
+            df = pd.read_csv(input_spreadsheet, encoding='utf-8-sig')
+        else:  # xlsx
+            df = pd.read_excel(input_spreadsheet, sheet_name=0)
     except Exception as e:
-        print(e)
+        print(f"Error reading file: {e}")
+        return
+    
+    # Clean the data - remove rows where first column is NaN (blank rows)
+    df = df.dropna(subset=[df.columns[0]])
+    
+    # Parse datetime columns
+    try:
+        df['start_datetime'] = pd.to_datetime(df['Interval Start Time'])
+        df['end_datetime'] = pd.to_datetime(df['Interval End Time'])
+    except Exception as e:
+        print(f"Error parsing datetime columns: {e}")
+        print("Make sure your data has 'Interval Start Time' and 'Interval End Time' columns")
+        return
+    
+    # Extract date and time components
+    df['date'] = df['start_datetime'].dt.date
+    df['time'] = df['start_datetime'].dt.time
+    df['time_str'] = df['start_datetime'].dt.strftime('%I:%M:%S %p')
+    
+    # Convert calls to numeric, handling any non-numeric values
+    df['calls'] = pd.to_numeric(df['Calls Presented'], errors='coerce').fillna(0).astype(int)
+    
+    # Group by date and time, sum the calls
+    result = df.groupby(['date', 'time_str'])['calls'].sum().unstack(fill_value=0)
+    
+    # Sort by time (chronological order)
+    time_columns = sorted(result.columns, key=lambda x: pd.to_datetime(x, format='%I:%M:%S %p').time())
+    result = result[time_columns]
+    
+    # Sort by date
+    result = result.sort_index()
+    
+    # Get output file location
+    output_csv = easygui.filesavebox(
+        "Select location to save output csv.",
+        title="Save Location",
+        default="output.csv",
+        filetypes=["*.csv"]
+    )
+    
+    if not output_csv:
+        print('No output file selected.')
+        return
+    
+    # Save the result
+    try:
+        result.to_csv(output_csv)
+        print(f"Successfully saved results to {output_csv}")
+        print(f"Processed {len(df)} rows of data")
+        print(f"Found {len(result)} unique dates and {len(result.columns)} time intervals")
+    except Exception as e:
+        print(f"Error saving file: {e}")
 
-days = list(interval_dict.keys())
-
-output_csv = easygui.filesavebox("Select location to save output csv.", 
-                    title="Save Location", 
-                    default="output.csv", 
-                    filetypes=["*.csv"] )
-
-with open(output_csv, 'w', newline="") as output:
-    writer = csv.writer(output)
-    header = ["Interval Start Time", "Interval End Time"]
-    for day in days:
-        header.append(day)
-    writer.writerow(header)
-    for i in range(len(start_times)):
-        row_numbers = []
-        for day in days:
-            try:
-                row_numbers.append(interval_dict[day][start_times[i]])
-            except KeyError as e:
-                row_numbers.append(0) # catches if that particular day did not have this time interval. 
-                print("Key error: day did not have this particular interval start time: \n", e)
-        row_to_write = [start_times[i], end_times[i]]
-        for item in row_numbers:
-            row_to_write.append(item)
-        writer.writerow(row_to_write)
-try:
-    os.remove('temp_file.csv')    
-    print("Temp file removed successfully.")
-except Exception as e:
-    print("Unable to remove temp file automatically.\n", e)
+if __name__ == "__main__":
+    process_call_rates()
