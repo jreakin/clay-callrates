@@ -26,7 +26,27 @@ def process_call_rates():
         if input_spreadsheet.endswith('.csv'):
             df = pd.read_csv(input_spreadsheet, encoding='utf-8-sig')
         else:  # xlsx
-            df = pd.read_excel(input_spreadsheet, sheet_name=0)
+            # Smart header detection for Excel files
+            df_raw = pd.read_excel(input_spreadsheet, sheet_name=0, header=None)
+            
+            # Find the first non-empty row that looks like headers
+            header_row = None
+            for i in range(min(5, len(df_raw))):  # Check first 5 rows
+                row = df_raw.iloc[i]
+                # Check if this row contains text that looks like column headers
+                if row.notna().any() and any(isinstance(val, str) and ' ' in val for val in row if pd.notna(val)):
+                    header_row = i
+                    break
+            
+            if header_row is not None:
+                # Use the identified header row
+                df = pd.read_excel(input_spreadsheet, sheet_name=0, header=header_row)
+                # Remove any rows above the header that might be empty
+                if header_row > 0:
+                    df = df.dropna(how='all')  # Remove completely empty rows
+            else:
+                # Fallback to default behavior
+                df = pd.read_excel(input_spreadsheet, sheet_name=0)
     except Exception as e:
         print(f"Error reading file: {e}")
         return
