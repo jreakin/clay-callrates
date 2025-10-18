@@ -1,8 +1,3 @@
-"""
-File reader implementations using Factory pattern.
-Handles different file formats (CSV, Excel) with a common interface.
-"""
-
 import pandas as pd
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -41,8 +36,30 @@ class ExcelReader(FileReader):
     """Reader for Excel files."""
     
     def read(self, file_path: str) -> pd.DataFrame:
-        """Read Excel file (first sheet only)."""
-        return pd.read_excel(file_path, sheet_name=0)
+        """Read Excel file (first sheet only) with proper header handling."""
+        # First, read without header assumption to inspect structure
+        df_raw = pd.read_excel(file_path, sheet_name=0, header=None)
+        
+        # Find the first non-empty row that looks like headers
+        header_row = None
+        for i in range(min(5, len(df_raw))):  # Check first 5 rows
+            row = df_raw.iloc[i]
+            # Check if this row contains text that looks like column headers
+            if row.notna().any() and any(isinstance(val, str) and ' ' in val for val in row if pd.notna(val)):
+                header_row = i
+                break
+        
+        if header_row is not None:
+            # Use the identified header row
+            df = pd.read_excel(file_path, sheet_name=0, header=header_row)
+            # Remove any rows above the header that might be empty
+            if header_row > 0:
+                df = df.dropna(how='all')  # Remove completely empty rows
+        else:
+            # Fallback to default behavior
+            df = pd.read_excel(file_path, sheet_name=0)
+        
+        return df
     
     def get_supported_extensions(self) -> list[str]:
         return ['.xlsx', '.xls']
