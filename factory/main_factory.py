@@ -3,8 +3,8 @@ Main entry point using Factory and Observer patterns.
 Demonstrates clean separation of concerns and extensible architecture.
 """
 
-from call_rates_app import CallRatesApplication
-from observers import ConsoleProgressObserver, DetailedConsoleObserver, SilentObserver
+from .call_rates_app import CallRatesApplication
+from .observers import ConsoleProgressObserver, DetailedConsoleObserver, SilentObserver
 
 
 def main():

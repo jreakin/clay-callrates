@@ -9,13 +9,18 @@ The original monolithic 86-line function has been refactored into a clean, modul
 ```
 clay-callrates/
 ├── main.py                    # Original implementation (for comparison)
-├── main_factory.py           # New factory pattern implementation
-├── call_rates_app.py         # Main application orchestrator
-├── file_readers.py           # Factory pattern for file reading
-├── data_processors.py        # Factory pattern for data processing
-├── observers.py              # Observer pattern for progress tracking
-├── demo_factory.py           # Demo showing all patterns in action
-└── README_FACTORY.md         # This documentation
+├── run_factory.py            # Entry point for factory pattern version
+├── demo_factory.py           # Entry point for factory pattern demo
+├── factory/                  # Factory pattern implementation
+│   ├── __init__.py           # Package initialization
+│   ├── main_factory.py       # Factory pattern main implementation
+│   ├── call_rates_app.py     # Main application orchestrator
+│   ├── file_readers.py       # Factory pattern for file reading
+│   ├── data_processors.py    # Factory pattern for data processing
+│   ├── observers.py          # Observer pattern for progress tracking
+│   ├── demo_factory.py       # Demo showing all patterns in action
+│   └── README_FACTORY.md     # This documentation
+└── example.xlsx              # Sample data file
 ```
 
 ## 🎯 Design Patterns Used
@@ -43,7 +48,7 @@ clay-callrates/
 
 ### Run the Factory Pattern Version:
 ```bash
-uv run --project clay-callrates python main_factory.py
+uv run --project clay-callrates python run_factory.py
 ```
 
 ### Run the Demo:

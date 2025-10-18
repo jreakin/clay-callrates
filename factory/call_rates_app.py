@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import List, Optional
 import pandas as pd
 
-from file_readers import FileReaderFactory
-from data_processors import DataProcessorFactory
-from observers import ProgressObserver
+from .file_readers import FileReaderFactory
+from .data_processors import DataProcessorFactory
+from .observers import ProgressObserver
 
 
 class CallRatesApplication:
