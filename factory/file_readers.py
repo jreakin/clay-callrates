@@ -66,9 +66,11 @@ class FileReaderFactory:
             supported_extensions = []
             for reader_class in cls._readers.values():
                 supported_extensions.extend(reader_class().get_supported_extensions())
+            # Deduplicate and sort extensions for a clean error message
+            unique_extensions = sorted(set(supported_extensions))
             raise ValueError(
                 f"Unsupported file type: {file_extension}. "
-                f"Supported types: {', '.join(supported_extensions)}"
+                f"Supported types: {', '.join(unique_extensions)}"
             )
         
         return cls._readers[file_extension]()
